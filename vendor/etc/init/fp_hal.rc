@@ -1,0 +1,22 @@
+service vendor.fps_hal_rianixia /vendor/bin/hw/fp_hal
+    # "class hal" causes a race condition on some devices due to files created
+    # in /data. As a workaround, postpone startup until later in boot once
+    # /data is mounted.
+    class late_start
+    user system
+    group system input uhid
+    writepid /dev/cpuset/system-background/tasks
+
+service vendor.fps_hal_transsion /vendor/bin/hw/android.hardware.biometrics.fingerprint@2.3-service.transsion
+    # "class hal" causes a race condition on some devices due to files created
+    # in /data. As a workaround, postpone startup until later in boot once
+    # /data is mounted.
+    class late_start
+    user system
+    group system input uhid
+    writepid /dev/cpuset/system-background/tasks
+
+# add for screen off fod
+on post-fs-data
+    write /proc/gesture_function fp1
+

@@ -1,0 +1,87 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Android NDK
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+          add-to-path: false
+
+      - name: Setup Android SDK (d8 + android.jar)
+        uses: android-actions/setup-android@v3
+
+      - name: Ensure SDK components
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Make scripts executable
+        run: chmod +x build.sh
+
+      - name: Build native binaries + embedded helper dex
+        env:
+          NDK: ${{ steps.ndk.outputs.ndk-path }}
+        run: ./build.sh
+
+      - name: Verify outputs
+        run: |
+          BIN_DIR="rom/vendor/bin/hw"
+          LIB_DIR="rom/system/lib64"
+
+          FILES=(
+            "$BIN_DIR/fodbridged"
+            "$BIN_DIR/fodinject"
+            "$LIB_DIR/libfodhook.so"
+          )
+
+          for f in "${FILES[@]}"; do
+            file "$f" | grep -q "ARM aarch64" || { echo "::error::$f is not aarch64"; exit 1; }
+          done
+
+      - name: Package ROM overlay
+        run: |
+          OVL="fod-native-cos17.zip"
+          rm -rf overlay
+          mkdir -p overlay/system/bin overlay/system/lib64 overlay/system/etc/init overlay/vendor/bin/hw
+          cp -r vendor/etc overlay/vendor/
+          cp -r vendor/lib64 overlay/vendor/
+          cp -r vendor/bin overlay/vendor/
+
+          install -m 0755 rom/vendor/bin/hw/fodbridged overlay/vendor/bin/hw/
+          install -m 0755 rom/vendor/bin/hw/fodinject overlay/vendor/bin/hw/
+          install -m 0755 rom/vendor/bin/hw/fodbridged overlay/system/bin/
+          install -m 0755 rom/vendor/bin/hw/fodinject overlay/system/bin/
+          install -m 0644 rom/system/lib64/libfodhook.so overlay/system/lib64/
+          install -m 0644 rom/system/etc/init/fodnative.rc overlay/system/etc/init/
+          install -m 0644 patch_libgf_hal.py overlay/system/bin/patch_libgf_hal.py 2>/dev/null || true
+
+          (cd overlay && zip -r9 "../$OVL" .)
+          unzip -l "$OVL"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: FOD-NATIVE-COS17
+          path: fod-native-cos17.zip
+
+      - name: Attach to release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: fod-native-cos17.zip

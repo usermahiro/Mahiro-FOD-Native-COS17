@@ -1,0 +1,18 @@
+# Native FOD bridge for ColorOS 17 / OPLUS ROM (no smali patch)
+#
+# fodbridged: reads EV_KEY 195 from the touchscreen, forwards to @fodhook
+# fodinject:  ptrace-injects libfodhook.so into com.android.systemui
+#
+# Run permissive for the first boot (see README).
+
+service vendor.fodbridged /vendor/bin/hw/fodbridged
+    class late_start
+    user root
+    group root system input
+    seclabel u:r:shell:s0
+
+service vendor.fodinject /vendor/bin/hw/fodinject
+    class late_start
+    user root
+    group root system
+    seclabel u:r:shell:s0
