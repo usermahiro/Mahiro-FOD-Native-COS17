@@ -32,7 +32,8 @@ javac -source 8 -target 8 -Xlint:-options \
     -classpath "$ANDROID_JAR" \
     -d build/helper_classes \
     src/helper/mahiro/fod/NativeUi.java
-"$D8" --lib "$ANDROID_JAR" --min-api 26 --output build/helper_dex build/helper_classes
+"$D8" --lib "$ANDROID_JAR" --min-api 26 --output build/helper_dex \
+    $(find build/helper_classes -name '*.class')
 
 python3 - "$PWD/build/helper_dex/classes.dex" "$PWD/build/helper_dex.h" <<'PY'
 import sys
